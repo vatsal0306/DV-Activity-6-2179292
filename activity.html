@@ -6,7 +6,6 @@
     <title>Document</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.js"></script>
     <link rel="stylesheet" href="styles.css">
-
 </head>
 <body>
 <div class="container">
@@ -22,7 +21,6 @@
 
         <label for="maxThreshold">Max Threshold</label>
         <input type="range" id="maxThreshold" min="0" max="1000" value="300" />
-
     </div>
 
     <hr />
@@ -41,146 +39,97 @@
 </div>
 
 <script>
-
     const svg = d3.select("svg");
     const path = d3.geoPath();
-    let currentBinCount = document.querySelector("#binCount").value;
-    let currentMin = document.querySelector("#minThreshold").value;
-    let currentMax = document.querySelector("#maxThreshold").value;
+    let currentBinCount = +document.querySelector("#binCount").value;
+    let currentMin = +document.querySelector("#minThreshold").value;
+    let currentMax = +document.querySelector("#maxThreshold").value;
 
-    let minValue, maxValue; // Declare variables for min and max values
-    function plot_contour(fileNumber)
-    {
+    let minValue, maxValue;
 
-        // Step 1 read csv file
-        d3.json("dicomData/"+fileNumber).then(data=>
+    function plot_contour(fileNumber) {
+        d3.json("dicomData/" + fileNumber).then(data => {
+            d3.select("svg").selectAll("*").remove();
 
-        {
-            d3.select("svg").selectAll("*").remove()
-            // data dimensions
-            let m= 256, n= 256;
-            // Step 2 convert data into 1D list
-            let values_density=[]
-            data.forEach(col=>{col.forEach(d=>values_density.push(+d))})
+            let m = 256, n = 256;
+            let values_density = [];
+            data.forEach(col => col.forEach(d => values_density.push(+d)));
 
-            const min_max = d3.extent(values_density,d=>d)
-            // Set initial min and max values
+            const min_max = d3.extent(values_density);
             minValue = min_max[0];
             maxValue = min_max[1];
 
-            document.querySelector("#minThreshold").min = minValue
-            document.querySelector("#minThreshold").max = maxValue
+            document.querySelector("#minThreshold").min = minValue;
+            document.querySelector("#minThreshold").max = maxValue;
+            document.querySelector("#maxThreshold").min = minValue;
+            document.querySelector("#maxThreshold").max = maxValue;
 
-            document.querySelector("#maxThreshold").min = minValue
-            document.querySelector("#maxThreshold").max = maxValue
+            const colors = d3.scaleLinear()
+                .domain(d3.range(currentBinCount).map(i => minValue + i * (maxValue - minValue) / currentBinCount))
+                .range(["#0d1a50", "#3e5eba", "#2b83ba", "#abdda4", "#ffffbf", "#fdae61", "#d7191c"])
+                .interpolate(d3.interpolateHcl);
 
-
-            /////////////////COLOR CODING/////////////////////////////
-
-
-            function draw(binCount,minThreshold,maxThreshold) {
-                ///////////////////////////////////////////////////////////
-                // Step 3 contour generator
-
-                const colors = d3.scaleLinear()
-                    .domain()
-                    .range(["#0d1a50", "#3e5eba", "#2b83ba", "#abdda4", "#ffffbf", "#fdae61", "#d7191c"])
-                    .interpolate(d3.interpolateHcl);
-
-
-                let contours = d3.contours()
+            function draw(binCount, minThreshold, maxThreshold) {
+                const contours = d3.contours()
                     .size([m, n])
-                    .thresholds()(values_density); // Using threshold
+                    .thresholds(d3.range(minThreshold, maxThreshold, (maxThreshold - minThreshold) / binCount))(values_density);
 
-
-                // Step 3 append contour to path (d)
                 svg.append("g")
-                    .attr("class","contours")
+                    .attr("class", "contours")
                     .selectAll("path")
                     .data(contours)
                     .enter()
                     .append("path")
-                    .attr("d",function(d){return path(d)})
-                    .attr("stroke","black")
-                    .attr("stroke-width",".1px")
+                    .attr("d", d => path(d))
+                    .attr("stroke", "black")
+                    .attr("stroke-width", ".1px")
                     .attr("stroke-linejoin", "round")
-                    .attr("fill",  d=> colors(d.value))
+                    .attr("fill", d => colors(d.value));
             }
 
-            function update(threshold){
+            draw(currentBinCount, currentMin, currentMax);
 
-                svg.selectAll(".contours").remove();
-
-                contours = d3.contours()
-                    .size([m, n])
-                    .thresholds(d3.range(min_max[0],min_max[1],threshold)) // threshold is 6 degrees
-                    (values_density);
-
-
-                svg.append("g")
-                    .attr("class","contours")
-                    .selectAll("path")
-                    .data(contours)
-                    .enter()
-                    .append("path")
-                    .attr("d",function(d){return path(d)})
-                    .attr("stroke","black")
-                    .attr("stroke-width",".1px")
-                    .attr("stroke-linejoin", "round")
-                    .attr("fill",  d=> colors(d.value))
-            }
-
-            draw(currentBinCount,currentMin,currentMax);
-
-            document.addEventListener("input",e=>{
-                currentBinCount  = document.querySelector("#binCount").value;
-                currentMin  = document.querySelector("#minThreshold").value;
-                currentMax  = document.querySelector("#maxThreshold").value;
+            document.addEventListener("input", e => {
+                currentBinCount = +document.querySelector("#binCount").value;
+                currentMin = +document.querySelector("#minThreshold").value;
+                currentMax = +document.querySelector("#maxThreshold").value;
 
                 const tagId = e.target.id;
-                if(tagId === "binCount" ||tagId === "minThreshold" ||tagId === "maxThreshold" ){
-                    draw(currentBinCount,currentMin,currentMax)
-                }})
-
-
-
-
-        })
+                if (tagId === "binCount" || tagId === "minThreshold" || tagId === "maxThreshold") {
+                    svg.selectAll(".contours").remove();
+                    draw(currentBinCount, currentMin, currentMax);
+                }
+            });
+        });
     }
-    filesList()
 
+    function filesList() {
+        const files_data = [
+            "brain_001.dcm.json", "brain_002.dcm.json", "brain_003.dcm.json", "brain_004.dcm.json",
+            "brain_005.dcm.json", "brain_006.dcm.json", "brain_007.dcm.json", "brain_008.dcm.json",
+            "brain_009.dcm.json", "brain_010.dcm.json", "brain_011.dcm.json", "brain_012.dcm.json",
+            "brain_013.dcm.json", "brain_014.dcm.json", "brain_015.dcm.json", "brain_016.dcm.json",
+            "brain_017.dcm.json", "brain_018.dcm.json", "brain_019.dcm.json", "brain_020.dcm.json"
+        ];
 
-    plot_contour("brain_001.dcm.json")
-
-    function filesList(){
-
-        const files_data = ["brain_001.dcm.json", "brain_002.dcm.json",
-            "brain_003.dcm.json","brain_004.dcm.json",
-            "brain_005.dcm.json", "brain_006.dcm.json",
-            "brain_007.dcm.json", "brain_008.dcm.json",
-            "brain_009.dcm.json", "brain_010.dcm.json",
-            "brain_011.dcm.json", "brain_012.dcm.json",
-            "brain_013.dcm.json", "brain_014.dcm.json",
-            "brain_015.dcm.json", "brain_016.dcm.json",
-            "brain_017.dcm.json", "brain_018.dcm.json", "brain_019.dcm.json", "brain_020.dcm.json"]
         const selectElement = d3.select("#files");
-        const options = selectElement
+        selectElement
             .selectAll("option")
             .data(files_data)
             .enter()
             .append("option")
-            .text(d=>d)
+            .text(d => d);
 
-        selectElement.on("change", (d)=>{
+        selectElement.on("change", () => {
             const selectedOption = selectElement.property("value");
-            plot_contour(selectedOption)
+            plot_contour(selectedOption);
         });
 
         selectElement.attr("size", files_data.length);
-
     }
 
-
+    filesList();
+    plot_contour("brain_001.dcm.json");
 </script>
 </body>
 </html>
